@@ -1,50 +1,45 @@
 """Sane defaults for known message definitions."""
 
-from .messaging.message_factory import MessageFactory
-from .messaging.message_types import MessageTypes
+from .messaging.protocol_registry import ProtocolRegistry
 
+from .messaging.actionmenu.message_types import (
+    CONTROLLERS as ACTIONMENU_CONTROLLERS,
+    MESSAGE_TYPES as ACTIONMENU_MESSAGES,
+)
 from .messaging.basicmessage.message_types import MESSAGE_TYPES as BASICMESSAGE_MESSAGES
 from .messaging.connections.message_types import MESSAGE_TYPES as CONNECTION_MESSAGES
+from .messaging.discovery.message_types import MESSAGE_TYPES as DISCOVERY_MESSAGES
+from .messaging.introduction.message_types import MESSAGE_TYPES as INTRODUCTION_MESSAGES
+from .messaging.presentations.message_types import (
+    MESSAGE_TYPES as PRESENTATION_MESSAGES,
+)
+from .messaging.credentials.message_types import MESSAGE_TYPES as CREDENTIAL_MESSAGES
 from .messaging.trustping.message_types import MESSAGE_TYPES as TRUSTPING_MESSAGES
 from .messaging.routing.message_types import MESSAGE_TYPES as ROUTING_MESSAGES
 
-# TODO move message registration to the module level
-
-CREDENTIAL_MESSAGES = {
-    MessageTypes.CREDENTIAL.value: (
-        "indy_catalyst_agent.messaging.credentials.messages.credential.Credential"
-    ),
-    MessageTypes.CREDENTIAL_OFFER.value: (
-        "indy_catalyst_agent.messaging.credentials.messages.credential_offer"
-        + ".CredentialOffer"
-    ),
-    MessageTypes.CREDENTIAL_REQUEST.value: (
-        "indy_catalyst_agent.messaging.credentials.messages.credential_request"
-        + ".CredentialRequest"
-    ),
-}
-
-PROOF_MESSAGES = {
-    MessageTypes.PROOF_REQUEST.value: (
-        "indy_catalyst_agent.messaging.proofs.messages.proof_request.ProofRequest",
-    ),
-    MessageTypes.PROOF.value: (
-        "indy_catalyst_agent.messaging.proofs.messages.proof.Proof"
-    ),
-}
+from .messaging.problem_report.message import (
+    MESSAGE_TYPE as PROBLEM_REPORT,
+    ProblemReport,
+)
 
 
-def default_message_factory() -> MessageFactory:
-    """Message factory for default message types."""
-    factory = MessageFactory()
+def default_protocol_registry() -> ProtocolRegistry:
+    """Protocol registry for default message types."""
+    registry = ProtocolRegistry()
 
-    factory.register_message_types(
+    registry.register_message_types(
+        ACTIONMENU_MESSAGES,
         BASICMESSAGE_MESSAGES,
         CONNECTION_MESSAGES,
+        DISCOVERY_MESSAGES,
+        INTRODUCTION_MESSAGES,
+        PRESENTATION_MESSAGES,
         CREDENTIAL_MESSAGES,
-        PROOF_MESSAGES,
         ROUTING_MESSAGES,
         TRUSTPING_MESSAGES,
+        {PROBLEM_REPORT: ProblemReport},
     )
 
-    return factory
+    registry.register_controllers(ACTIONMENU_CONTROLLERS)
+
+    return registry

@@ -3,7 +3,6 @@
 from ...base_handler import BaseHandler, BaseResponder, RequestContext
 from ..messages.ping import Ping
 from ..messages.ping_response import PingResponse
-from ....models.thread_decorator import ThreadDecorator
 
 
 class PingHandler(BaseHandler):
@@ -21,14 +20,30 @@ class PingHandler(BaseHandler):
         self._logger.debug(f"PingHandler called with context {context}")
         assert isinstance(context.message, Ping)
 
-        self._logger.info("Received trust ping from: %s", context.sender_did)
+        self._logger.info(
+            "Received trust ping from: %s", context.message_delivery.sender_did
+        )
 
-        if not context.connection_active:
+        response_state = (
+            context.connection_record
+            and context.connection_record.state
+            == context.connection_record.STATE_RESPONSE
+        )
+        if not context.connection_active and not response_state:
             self._logger.info(
-                "Connection not active, skipping ping response: %s", context.sender_did
+                "Connection not active, skipping ping response: %s",
+                context.message_delivery.sender_did,
             )
             return
 
+        await context.connection_record.log_activity(
+            context, "ping", context.connection_record.DIRECTION_RECEIVED
+        )
+
         if context.message.response_requested:
-            reply = PingResponse(_thread=ThreadDecorator(thid=context.message._id))
+            reply = PingResponse()
+            reply.assign_thread_from(context.message)
             await responder.send_reply(reply)
+            await context.connection_record.log_activity(
+                context, "ping", context.connection_record.DIRECTION_SENT
+            )

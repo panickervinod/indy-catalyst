@@ -1,6 +1,8 @@
 """Basic message handler."""
 
 from ...base_handler import BaseHandler, BaseResponder, RequestContext
+from ...util import send_webhook
+
 from ..messages.basicmessage import BasicMessage
 
 
@@ -20,8 +22,44 @@ class BasicMessageHandler(BaseHandler):
 
         self._logger.info("Received basic message: %s", context.message.content)
 
-        content = context.message.content
-        if content.startswith("Reply with: "):
-            reply = content[12:]
-            reply = BasicMessage(content=reply, _l10n=context.message._l10n)
-            await responder.send_reply(reply)
+        body = context.message.content
+        meta = {"content": body}
+
+        # For Workshop: mark invitations as copyable
+        if context.message.content and context.message.content.startswith("http"):
+            meta["copy_invite"] = True
+
+        await context.connection_record.log_activity(
+            context, "message", context.connection_record.DIRECTION_RECEIVED, meta
+        )
+
+        send_webhook(
+            context,
+            "basicmessages",
+            {"message_id": context.message._id, "content": body, "state": "received"},
+        )
+
+        reply = None
+        if context.settings.get("debug.auto_respond_messages"):
+            if (
+                "received your message" not in body
+                and "received your invitation" not in body
+            ):
+                if context.message.content.startswith("http"):
+                    reply = f"{context.default_label} received your invitation"
+                else:
+                    reply = f"{context.default_label} received your message"
+        elif body.startswith("Reply with: "):
+            reply = body[12:]
+
+        if reply:
+            reply_msg = BasicMessage(content=reply)
+            if "l10n" in context.message._decorators:
+                reply_msg._decorators["l10n"] = context.message._decorators["l10n"]
+            await responder.send_reply(reply_msg)
+            await context.connection_record.log_activity(
+                context,
+                "message",
+                context.connection_record.DIRECTION_SENT,
+                {"content": reply},
+            )

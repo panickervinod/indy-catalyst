@@ -1,8 +1,10 @@
 """Indy implementation of BaseWallet interface."""
 
 import json
+import logging
 from typing import Sequence
 
+import indy.anoncreds
 import indy.did
 import indy.crypto
 import indy.pairwise
@@ -27,9 +29,12 @@ class IndyWallet(BaseWallet):
         Initialize a `IndyWallet` instance.
 
         Args:
-            config: {name, key, seed, did, auto-create, auto-remove}
+            config: {name, key, seed, did, auto-create, auto-remove,
+                     storage_type, storage_config, storage_creds}
 
         """
+        self.logger = logging.getLogger(__name__)
+
         if not config:
             config = {}
         super(IndyWallet, self).__init__(config)
@@ -40,6 +45,9 @@ class IndyWallet(BaseWallet):
         self._key = config.get("key") or self.DEFAULT_KEY
         self._name = config.get("name") or self.DEFAULT_NAME
         self._storage_type = config.get("storage_type") or self.DEFAULT_STORAGE_TYPE
+        self._storage_config = config.get("storage_config", None)
+        self._storage_creds = config.get("storage_creds", None)
+        self._master_secret_id = None
 
     @property
     def handle(self):
@@ -75,6 +83,17 @@ class IndyWallet(BaseWallet):
         return self._name
 
     @property
+    def master_secret_id(self) -> str:
+        """
+        Accessor for the master secret id.
+
+        Returns:
+            The master secret id
+
+        """
+        return self._master_secret_id
+
+    @property
     def _wallet_config(self) -> dict:
         """
         Accessor for the wallet config.
@@ -83,11 +102,15 @@ class IndyWallet(BaseWallet):
             The wallet config
 
         """
-        return {
+        ret = {
             "id": self._name,
             "freshness_time": self._freshness_time,
             "storage_type": self._storage_type,
+            # storage_config
         }
+        if self._storage_config is not None:
+            ret["storage_config"] = json.loads(self._storage_config)
+        return ret
 
     @property
     def _wallet_access(self) -> dict:
@@ -98,11 +121,14 @@ class IndyWallet(BaseWallet):
             The wallet access
 
         """
-        return {
+        ret = {
             "key": self._key,
             # key_derivation_method
             # storage_credentials
         }
+        if self._storage_creds is not None:
+            ret["storage_credentials"] = json.loads(self._storage_creds)
+        return ret
 
     async def create(self, replace: bool = False):
         """
@@ -193,6 +219,18 @@ class IndyWallet(BaseWallet):
                     raise WalletError("Wallet is already open: {}".format(self.name))
                 else:
                     raise WalletError(str(x_indy))
+
+        self.logger.info("Creating master secret...")
+        try:
+            self._master_secret_id = await indy.anoncreds.prover_create_master_secret(
+                self.handle, self.name
+            )
+        except IndyError as error:
+            if error.error_code == ErrorCode.AnoncredsMasterSecretDuplicateNameError:
+                self.logger.info("Master secret already exists")
+                self._master_secret_id = self.name
+            else:
+                raise
 
     async def close(self):
         """Close previously-opened wallet, removing it if so configured."""

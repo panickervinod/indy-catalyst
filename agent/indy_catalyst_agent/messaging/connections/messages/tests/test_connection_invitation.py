@@ -1,5 +1,5 @@
 from ..connection_invitation import ConnectionInvitation
-from ....message_types import MessageTypes
+from ...message_types import CONNECTION_INVITATION
 
 from unittest import mock, TestCase
 
@@ -14,25 +14,21 @@ class TestConnectionInvitation(TestCase):
 
     def test_init(self):
         connection_invitation = ConnectionInvitation(
-            label=self.label,
-            did=self.did,
-            recipient_keys=[self.key],
-            endpoint=self.endpoint_url,
+            label=self.label, recipient_keys=[self.key], endpoint=self.endpoint_url
         )
         assert connection_invitation.label == self.label
-        assert connection_invitation.did == self.did
         assert connection_invitation.recipient_keys == [self.key]
         assert connection_invitation.endpoint == self.endpoint_url
 
+        connection_invitation = ConnectionInvitation(label=self.label, did=self.did)
+        assert connection_invitation.did == self.did
+
     def test_type(self):
         connection_invitation = ConnectionInvitation(
-            label=self.label,
-            did=self.did,
-            recipient_keys=[self.key],
-            endpoint=self.endpoint_url,
+            label=self.label, recipient_keys=[self.key], endpoint=self.endpoint_url
         )
 
-        assert connection_invitation._type == MessageTypes.CONNECTION_INVITATION.value
+        assert connection_invitation._type == CONNECTION_INVITATION
 
     @mock.patch(
         "indy_catalyst_agent.messaging.connections.messages."
@@ -54,10 +50,7 @@ class TestConnectionInvitation(TestCase):
     )
     def test_serialize(self, mock_connection_invitation_schema_dump):
         connection_invitation = ConnectionInvitation(
-            label=self.label,
-            did=self.did,
-            recipient_keys=[self.key],
-            endpoint=self.endpoint_url,
+            label=self.label, recipient_keys=[self.key], endpoint=self.endpoint_url
         )
 
         connection_invitation_dict = connection_invitation.serialize()
@@ -69,6 +62,15 @@ class TestConnectionInvitation(TestCase):
             connection_invitation_dict
             is mock_connection_invitation_schema_dump.return_value
         )
+
+    def test_url_round_trip(self):
+        connection_invitation = ConnectionInvitation(
+            label=self.label, recipient_keys=[self.key], endpoint=self.endpoint_url
+        )
+        url = connection_invitation.to_url()
+        assert isinstance(url, str)
+        invitation = ConnectionInvitation.from_url(url)
+        assert isinstance(invitation, ConnectionInvitation)
 
 
 class TestConnectionInvitationSchema(TestCase):

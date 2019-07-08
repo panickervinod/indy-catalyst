@@ -2,7 +2,7 @@ from asynctest import TestCase as AsyncTestCase
 from marshmallow import fields
 
 from ..agent_message import AgentMessage, AgentMessageSchema
-from ...models.field_signature import FieldSignature
+from ..decorators.signature_decorator import SignatureDecorator
 from ...wallet.basic import BasicWallet
 
 
@@ -31,6 +31,16 @@ class SignedAgentMessageSchema(AgentMessageSchema):
     value = fields.Str(required=True)
 
 
+class BasicAgentMessage(AgentMessage):
+    """Simple agent message implementation"""
+
+    class Meta:
+        """Meta data"""
+
+        schema_class = "AgentMessageSchema"
+        message_type = "basic-message"
+
+
 class TestAgentMessage(AsyncTestCase):
     """Tests agent message."""
 
@@ -56,7 +66,7 @@ class TestAgentMessage(AsyncTestCase):
         msg.value = "Test value"
         await msg.sign_field("value", key_info.verkey, wallet)
         sig = msg.get_signature("value")
-        assert isinstance(sig, FieldSignature)
+        assert isinstance(sig, SignatureDecorator)
 
         assert await sig.verify(wallet)
         assert await msg.verify_signed_field("value", wallet) == key_info.verkey
@@ -68,3 +78,11 @@ class TestAgentMessage(AsyncTestCase):
         loaded = SignedAgentMessage.deserialize(serial)
         assert isinstance(loaded, SignedAgentMessage)
         assert await loaded.verify_signed_field("value", wallet) == key_info.verkey
+
+    async def test_assign_thread(self):
+        msg = BasicAgentMessage()
+        assert msg._thread_id == msg._id
+        reply = BasicAgentMessage()
+        reply.assign_thread_from(msg)
+        assert reply._thread_id == msg._thread_id
+        assert reply._thread_id != reply._id
